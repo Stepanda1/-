@@ -105,11 +105,11 @@
 
 ## Запуск
 
-1. Клонировать репозиторий:
+1. Клонировать репозиторий в локальную папку `crypto-analysis`:
 
 ```bash
-git clone https://github.com/Stepanda1/-.git
-cd -
+git clone https://github.com/Stepanda1/-.git crypto-analysis
+cd crypto-analysis
 ```
 
 2. Создать виртуальное окружение и установить зависимости:
