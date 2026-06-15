@@ -1,10 +1,8 @@
 name: Fetch crypto dataset
 
 on:
-  push:
-    paths:
-      - scripts/fetch_data.py
-      - .github/workflows/fetch-data.yml
+  pull_request_target:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
@@ -12,30 +10,46 @@ permissions:
 
 jobs:
   fetch-data:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Stop if dataset already exists
+        id: dataset
+        run: |
+          if [ -f data/raw_crypto_data.csv ] && [ "$(wc -l < data/raw_crypto_data.csv)" -eq 2921 ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Python
+        if: steps.dataset.outputs.exists != 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install dependencies
+        if: steps.dataset.outputs.exists != 'true'
         run: pip install pandas requests
 
       - name: Download dataset
+        if: steps.dataset.outputs.exists != 'true'
         env:
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
         run: python scripts/fetch_data.py
 
-      - name: Commit dataset
+      - name: Commit dataset to PR branch
+        if: steps.dataset.outputs.exists != 'true' && github.event_name == 'pull_request_target'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f data/raw_crypto_data.csv
-          git diff --cached --quiet && exit 0
           git commit -m "Добавить исходный датасет криптовалют"
-          git push
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
